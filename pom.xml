@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!--
+  ~ Copyright (c) 2012-2025 Savoir Technologies, Inc.
+  ~
+  ~ Licensed under the Apache License, Version 2.0 (the "License");
+  ~ you may not use this file except in compliance with the License.
+  ~ You may obtain a copy of the License at
+  ~
+  ~      http://www.apache.org/licenses/LICENSE-2.0
+  ~
+  ~ Unless required by applicable law or agreed to in writing, software
+  ~ distributed under the License is distributed on an "AS IS" BASIS,
+  ~ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  ~ See the License for the specific language governing permissions and
+  ~ limitations under the License.
+  -->
+
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+                             http://maven.apache.org/maven-v4_0_0.xsd">
+
+
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>com.savoir.mcp.demo</groupId>
+    <artifactId>langchain-mcp-demo</artifactId>
+    <packaging>pom</packaging>
+    <version>1.0.0-SNAPSHOT</version>
+
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+
+        <commons-lang3.version>3.4</commons-lang3.version>
+        <gson.version>2.10.1</gson.version>
+        <guava.version>18.0</guava.version>
+        <jackson.version>2.18.0</jackson.version>
+        <jtokkit.version>1.1.0</jtokkit.version>
+        <annotation.version>1.4.0</annotation.version>
+        <maven.bundle.plugin.version>5.1.6</maven.bundle.plugin.version>
+        <osgi.core.version>8.0.0</osgi.core.version>
+        <karaf.version>4.4.7</karaf.version>
+        <langchain4j.version>1.0.0-beta2</langchain4j.version>
+        <converter-jackson.version>2.9.0</converter-jackson.version>
+        <retrofit.version>2.9.0</retrofit.version>
+        <openai4j.version>0.27.0</openai4j.version>
+        <okio-jvm.version>3.10.2</okio-jvm.version>
+        <okhttp.version>5.0.0-alpha.14</okhttp.version>
+        <kotlin-stdlib.version>2.0.20</kotlin-stdlib.version>
+    </properties>
+
+    <pluginRepositories>
+        <!-- Apache snapshots -->
+        <pluginRepository>
+            <id>apache-snapshots</id>
+            <name>Apache Snapshots Repository</name>
+            <url>https://repository.apache.org/content/groups/snapshots-group</url>
+            <releases>
+                <enabled>false</enabled>
+            </releases>
+            <snapshots>
+                <enabled>true</enabled>
+            </snapshots>
+        </pluginRepository>
+    </pluginRepositories>
+
+    <modules>
+        <module>BookStoreAPI</module>
+        <module>BookStoreImpl</module>
+        <module>BookStoreCommand</module>
+        <module>BookStoreFeature</module>
+    </modules>
+
+    <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <version>3.10.1</version>
+                    <configuration>
+                        <source>11</source>
+                        <target>11</target>
+                        <maxmem>256M</maxmem>
+                    </configuration>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <source>11</source>
+                    <target>11</target>
+                    <maxmem>512M</maxmem>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-enforcer-plugin</artifactId>
+                <version>3.1.0</version>
+                <executions>
+                    <execution>
+                        <id>enforce-maven</id>
+                        <goals>
+                            <goal>enforce</goal>
+                        </goals>
+                        <configuration>
+                            <rules>
+                                <requireMavenVersion>
+                                    <version>[3.5.3,4)</version>
+                                </requireMavenVersion>
+                                <requireJavaVersion>
+                                    <version>[11,)</version>
+                                </requireJavaVersion>
+                            </rules>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>
