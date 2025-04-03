@@ -31,7 +31,6 @@ import dev.langchain4j.service.tool.ToolProvider;
 import java.time.Duration;
 import java.util.List;
 import org.osgi.service.component.annotations.Component;
-import org.osgi.service.component.annotations.Deactivate;
 
 @Component(service = SavoirBooks.class)
 public class SavoirBooksImpl implements SavoirBooks {
@@ -53,10 +52,15 @@ public class SavoirBooksImpl implements SavoirBooks {
                 .logResponses(true)
                 .build();
 
+        setupTransport();
+    }
+
+    private void setupTransport() {
         transport = new HttpMcpTransport.Builder()
                 .sseUrl("http://localhost:3001/sse")
                 .logRequests(true)
                 .logResponses(true)
+                .timeout(Duration.ofSeconds(60))
                 .build();
     }
 
@@ -92,6 +96,10 @@ public class SavoirBooksImpl implements SavoirBooks {
 
     @Override
     public String ask(String question) {
+        if (transport == null) {
+            setupTransport();
+        }
+
         McpClient mcpClient = new DefaultMcpClient.Builder()
                 .transport(transport)
                 .build();
@@ -111,16 +119,13 @@ public class SavoirBooksImpl implements SavoirBooks {
             response = bot.ask(question);
         } catch (Exception e) {
             System.out.println("ERROR: " + e.getMessage());
+        } finally {
+            try {
+                transport.close();
+            } catch (Exception e) {
+                System.out.println("ERROR: " + e.getMessage());
+            }
         }
         return response;
-    }
-
-    @Deactivate
-    void deactivate() {
-        try {
-            transport.close();
-        } catch (Exception e) {
-            //Log Error
-        }
     }
 }
