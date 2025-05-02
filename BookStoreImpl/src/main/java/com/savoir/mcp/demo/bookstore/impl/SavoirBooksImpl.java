@@ -18,6 +18,8 @@ package com.savoir.mcp.demo.bookstore.impl;
 import com.savoir.mcp.demo.bookstore.api.SavoirBooks;
 import com.savoir.mcp.demo.bookstore.api.Book;
 
+import dev.langchain4j.agent.tool.ToolExecutionRequest;
+import dev.langchain4j.data.message.ToolExecutionResultMessage;
 import dev.langchain4j.model.chat.ChatLanguageModel;
 
 import dev.langchain4j.mcp.McpToolProvider;
@@ -28,12 +30,27 @@ import dev.langchain4j.mcp.client.transport.http.HttpMcpTransport;
 import dev.langchain4j.model.ollama.OllamaChatModel;
 import dev.langchain4j.service.AiServices;
 import dev.langchain4j.service.tool.ToolProvider;
+import io.github.resilience4j.timelimiter.TimeLimiter;
+import io.github.resilience4j.timelimiter.TimeLimiterConfig;
+import io.github.resilience4j.timelimiter.TimeLimiterRegistry;
 import java.time.Duration;
 import java.util.List;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeoutException;
+import java.util.function.Function;
+import java.util.function.Supplier;
 import org.osgi.service.component.annotations.Component;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Component(service = SavoirBooks.class)
 public class SavoirBooksImpl implements SavoirBooks {
+
+    private static final Logger logger = LoggerFactory.getLogger(SavoirBooksImpl.class);
 
     ChatLanguageModel model;
     SavoirBot bot;
@@ -46,21 +63,44 @@ public class SavoirBooksImpl implements SavoirBooks {
         model = OllamaChatModel.builder()
                 .baseUrl(BASE_URL)
                 .modelName(MODEL_NAME)
-                .temperature(0.8)
+                .temperature(0.2) // Low temperature for deterministic, fact-based answers
                 .timeout(Duration.ofSeconds(60))
                 .logRequests(true)
                 .logResponses(true)
                 .build();
 
-        setupTransport();
-    }
-
-    private void setupTransport() {
         transport = new HttpMcpTransport.Builder()
                 .sseUrl("http://localhost:3001/sse")
                 .logRequests(true)
                 .logResponses(true)
                 .timeout(Duration.ofSeconds(60))
+                .build();
+
+        McpClient mcpClient = new DefaultMcpClient.Builder()
+                .transport(transport)
+                .build();
+
+        ToolProvider toolProvider = McpToolProvider.builder()
+                .mcpClients(List.of(mcpClient))
+                .build();
+
+        // Define a system message to  instruct the model on how it should behave throughout the session.
+        Function<Object, String> functionSystemMessageProvider = (ignored) ->
+                "You are a truthful assistant. If you don't know something, say 'I don't know' instead of making up an answer. " +
+                "Do not tell users about functions to obtain answer to query - execute the function. " +
+                "If you provide an answer, explain how you know or where the information came from. If unsure, say so. " +
+                "If an API request fails then inform the user of the error, do not try other methods. ";
+
+        // Define a custom hallucination strategy
+        Function<ToolExecutionRequest, ToolExecutionResultMessage> customStrategy = request -> {
+            return ToolExecutionResultMessage.from(request, "Error: the tool '" + request.name() + "' does not exist.");
+        };
+
+        bot = AiServices.builder(SavoirBot.class)
+                .chatLanguageModel(model)
+                .systemMessageProvider(functionSystemMessageProvider)
+                .hallucinatedToolNameStrategy(customStrategy)
+                .toolProvider(toolProvider)
                 .build();
     }
 
@@ -96,36 +136,56 @@ public class SavoirBooksImpl implements SavoirBooks {
 
     @Override
     public String ask(String question) {
-        if (transport == null) {
-            setupTransport();
-        }
 
-        McpClient mcpClient = new DefaultMcpClient.Builder()
-                .transport(transport)
+        // Configure the TimeLimiter
+        TimeLimiterConfig config = TimeLimiterConfig.custom()
+                .timeoutDuration(Duration.ofSeconds(8))  // max time allowed
+                .cancelRunningFuture(true)
                 .build();
 
-        ToolProvider toolProvider = McpToolProvider.builder()
-                .mcpClients(List.of(mcpClient))
-                .build();
+        // Add to registry
+        TimeLimiterRegistry registry = TimeLimiterRegistry.of(config);
 
-        bot = AiServices.builder(SavoirBot.class)
-                .chatLanguageModel(model)
-                .toolProvider(toolProvider)
-                .build();
+        // Create time limiter with name.
+        TimeLimiter timeLimiter = registry.timeLimiter("aiAskTimeLimiter");
 
-        String response = "";
-        try {
-            // Our opportunity to use tools, such as MCP.
-            response = bot.ask(question);
-        } catch (Exception e) {
-            System.out.println("ERROR: " + e.getMessage());
-        } finally {
+        // Executor for async work
+        ExecutorService executorService = Executors.newSingleThreadExecutor();
+
+        // Potentially long-running task
+        Callable<String> aiTask = () -> {
             try {
-                transport.close();
+                // Our opportunity to use tools, such as MCP.
+                return bot.ask(question);
             } catch (Exception e) {
-                System.out.println("ERROR: " + e.getMessage());
+                logger.error(e.getMessage());
+                return e.getMessage();
             }
+        };
+
+        String response = null;
+        // Wrap the task in a CompletableFuture
+        Supplier<CompletableFuture<String>> futureSupplier = () ->
+                CompletableFuture.supplyAsync(() -> {
+                    try {
+                        return aiTask.call();
+                    } catch (Exception e) {
+                        throw new CompletionException(e);
+                    }
+                }, executorService);
+
+        try {
+            response = timeLimiter.executeFutureSupplier(futureSupplier);
+        } catch (TimeoutException e) {
+            logger.error("Timed out! " + e.getMessage());
+            response = e.getMessage();
+        } catch (Exception e) {
+            logger.error(e.getMessage());
+            response = e.getMessage();
+        } finally {
+            executorService.shutdownNow();
         }
+
         return response;
     }
 }

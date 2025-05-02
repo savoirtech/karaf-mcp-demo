@@ -33,6 +33,18 @@
             <scope>provided</scope>
         </dependency>
 
+        <!-- Resilience4j -->
+        <dependency>
+            <groupId>io.github.resilience4j</groupId>
+            <artifactId>resilience4j-core</artifactId>
+            <version>2.3.0</version>
+        </dependency>
+        <dependency>
+            <groupId>io.github.resilience4j</groupId>
+            <artifactId>resilience4j-timelimiter</artifactId>
+            <version>2.3.0</version>
+        </dependency>
+
         <!-- LangChain4J Dependencies -->
         <dependency>
             <groupId>dev.langchain4j</groupId>

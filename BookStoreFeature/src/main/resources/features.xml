@@ -32,6 +32,8 @@
         <feature>scr</feature>
         <feature version="${project.version}">_mcp-demo-deps</feature>
         <bundle>wrap:mvn:org.apache.opennlp/opennlp-tools/1.9.4</bundle>
+        <bundle>wrap:mvn:io.github.resilience4j/resilience4j-core/2.3.0</bundle>
+        <bundle>wrap:mvn:io.github.resilience4j/resilience4j-timelimiter/2.3.0</bundle>
         <bundle dependency="true">mvn:com.google.code.gson/gson/${gson.version}</bundle>
         <bundle dependency="true">wrap:mvn:com.knuddels/jtokkit/${jtokkit.version}</bundle>
         <bundle start-level="85">mvn:com.savoir.mcp.demo/BookStoreAPI/${project.version}</bundle>
